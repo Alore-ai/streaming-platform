@@ -46,7 +46,7 @@ const PlayerContainer = styled.div`
 const Video = styled.video`
     top: 0;
     bottom: 0;
-    width: 100%;
+    width: 70%;
     height: 100%;
     object-fit: contain; /* Maintain aspect ratio */
     pointer-events: none;
