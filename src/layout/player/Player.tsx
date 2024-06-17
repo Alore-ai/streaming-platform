@@ -12,11 +12,11 @@ const PlayerOverlay = styled.div`
 `;
 
 const PlayerControlsWrapper = styled.div`
-    position: absolute;
-    z-index: 1;
-    bottom: 0;
-    left: 0;
-    width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
 `;
 
 const PlayerBack = styled.button`

@@ -7,7 +7,6 @@ import React, {
     useState,
 } from "react";
 import styled from "styled-components";
-import Hls from "hls.js";
 import {
     resetPlayer,
     setBuffer,
@@ -24,9 +23,6 @@ import { PlayerProps } from "./Player";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@lib/redux";
 
-const HLS_VIDEO_SRC = "https://alore--alore-alore-serve-video-dev.modal.run";
-export const HLS_VIDEO_DURATION = 888;
-
 interface PlayerContextData {
     videoRef: MutableRefObject<HTMLVideoElement | null>;
     controlsActive: boolean;
@@ -36,20 +32,61 @@ interface PlayerContextData {
     missingTimeStamp: () => string;
     timeStampFromAbs: (abs: number) => string;
     jumpToAbs: (abs: number) => void;
+    promptValue: string;
+    setPromptValue: (value: string) => void;
 }
 
 const PlayerContext = createContext<PlayerContextData>({} as PlayerContextData);
 
+const PlayerContainer = styled.div`
+  display: flex;
+  height: 100vh;
+`;
+
 const Video = styled.video`
-    position: absolute;
-    z-index: -1;
     top: 0;
     bottom: 0;
     width: 100%;
     height: 100%;
-    margin: auto;
+    object-fit: contain; /* Maintain aspect ratio */
     pointer-events: none;
     user-select: none;
+`;
+
+const VideoContainer = styled.div`
+  flex-grow: 1;
+  flex-shrink: 1;
+  position: relative;
+  overflow: hidden;
+`;
+
+const PromptField = styled.input`
+  background-color: lightblue;
+  color: black;
+  padding: 5px 10px;
+  border: 2px solid blue;
+  border-radius: 5px;
+  font-size: 16px;
+  outline: none;
+  width: 80%; /* Adjust width */
+  margin-bottom: 20px; /* Add some margin */
+  z-index: 2;
+`;
+
+const SidePanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  width: 30%;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+`;
+
+const ChatHistory = styled.div`
+  height: calc(100vh - 100px); /* Adjust height based on your needs */
+  overflow-y: auto; /* Add scrollbar if content exceeds height */
+  padding: 10px;
+  background-color: #f0f0f0; /* Add a background color for better visibility */
 `;
 
 export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
@@ -63,20 +100,52 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const [controlsActive, setControlsActive] = useState<boolean>(false);
+    const [promptValue, setPromptValue] = useState<string>('');
+
+    const handlePromptChange = async (promptValue: string) => {
+        const newPromptValue = promptValue;
+
+        try {
+            const response = await fetch('https://alore--alore-alore-prompt-dev.modal.run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt: newPromptValue })
+            });
+
+            if (response.ok) {
+                console.log('Prompt sent successfully');
+            } else {
+                throw new Error('Failed to send prompt');
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>, promptValue: string) => {
+        if (event.key === 'Enter') {
+            handlePromptChange(promptValue);
+        }
+    };
 
     useEffect(() => {
         if (!videoRef.current || watchlistLoading) {
             return;
         }
 
-        if (!Hls.isSupported()) {
-            videoRef.current.src = HLS_VIDEO_SRC;
-            return;
-        }
+        const eventSource = new EventSource('https://alore--alore-alore-video-stream-dev.modal.run');
 
-        const hls = new Hls();
-        hls.loadSource(HLS_VIDEO_SRC);
-        hls.attachMedia(videoRef.current);
+        eventSource.onmessage = (event) => {
+            const videoData = JSON.parse(event.data);
+
+            // Update the video player with the received data
+            if (videoRef.current) {
+                videoRef.current.src = videoData.videoUrl;
+                videoRef.current.play();
+            }
+        };
 
         const progress = hasShowProgress(show.id);
 
@@ -89,11 +158,11 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
         }
 
         return () => {
-            if (hls.media) {
-                addProgressToWatchlist(show, hls.media.currentTime);
-            }
+            // if (hls.media) {
+            //     addProgressToWatchlist(show, hls.media.currentTime);
+            // }
 
-            hls.destroy();
+            eventSource.close();
             dispatch(resetPlayer());
         };
     }, [watchlistLoading, addProgressToWatchlist, dispatch, hasShowProgress, show]);
@@ -296,8 +365,26 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
                 missingTimeStamp,
                 timeStampFromAbs,
                 jumpToAbs,
+                promptValue,
+                setPromptValue,
             }}>
-            <Video ref={videoRef} {...eventListeners} />
+            <PlayerContainer>
+                <VideoContainer>
+                    <Video ref={videoRef} {...eventListeners} />
+                </VideoContainer>
+                <SidePanel>
+                    <PromptField
+                        type="text"
+                        placeholder="Enter your prompt here"
+                        value={promptValue}
+                        onChange={(event) => setPromptValue(event.target.value)}
+                        onKeyPress={(event) => handleKeyPress(event, promptValue)}
+                    />
+                    <ChatHistory>
+                        {/* Add chat history components or content here */}
+                    </ChatHistory>
+                </SidePanel>
+            </PlayerContainer>
             {children}
         </PlayerContext.Provider>
     );
