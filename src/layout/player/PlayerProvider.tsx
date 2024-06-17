@@ -24,7 +24,7 @@ import { PlayerProps } from "./Player";
 import { useDispatch } from "react-redux";
 import { useAppSelector } from "@lib/redux";
 
-const HLS_VIDEO_SRC = "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8";
+const HLS_VIDEO_SRC = "https://alore--alore-alore-serve-video-dev.modal.run";
 export const HLS_VIDEO_DURATION = 888;
 
 interface PlayerContextData {
