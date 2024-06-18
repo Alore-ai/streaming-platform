@@ -131,21 +131,43 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
     };
 
     useEffect(() => {
+        const fetchVideoStream = async () => {
+            const response = await fetch('https://alore--alore-alore-video-stream-dev.modal.run');
+            const reader = response.body.getReader();
+            const stream = new ReadableStream({
+              start(controller) {
+                const read = () => {
+                  reader.read().then(({ done, value }) => {
+                    if (done) {
+                      controller.close();
+                      return;
+                    }
+                    // Convert hex string back to binary data
+                    const hexString = new TextDecoder("utf-8").decode(value);
+                    const binaryString = hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16));
+                    const uint8Array = new Uint8Array(binaryString);
+                    controller.enqueue(uint8Array);
+                    read();
+                  });
+                };
+                read();
+              }
+            });
+      
+            const responseStream = stream.pipeThrough(new TextDecoderStream());
+            const blob = await new Response(responseStream).blob();
+            const videoURL = URL.createObjectURL(blob);
+            if (videoRef.current) {
+              videoRef.current.src = videoURL;
+              videoRef.current.play();
+            }
+          };
+
+        fetchVideoStream();
+        
         if (!videoRef.current || watchlistLoading) {
             return;
         }
-
-        const eventSource = new EventSource('https://alore--alore-alore-video-stream-dev.modal.run');
-
-        eventSource.onmessage = (event) => {
-            const videoData = JSON.parse(event.data);
-
-            // Update the video player with the received data
-            if (videoRef.current) {
-                videoRef.current.src = videoData.videoUrl;
-                videoRef.current.play();
-            }
-        };
 
         const progress = hasShowProgress(show.id);
 
@@ -158,11 +180,6 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
         }
 
         return () => {
-            // if (hls.media) {
-            //     addProgressToWatchlist(show, hls.media.currentTime);
-            // }
-
-            eventSource.close();
             dispatch(resetPlayer());
         };
     }, [watchlistLoading, addProgressToWatchlist, dispatch, hasShowProgress, show]);
