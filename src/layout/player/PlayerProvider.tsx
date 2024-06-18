@@ -133,6 +133,9 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
     useEffect(() => {
         const fetchVideoStream = async () => {
             const response = await fetch('https://alore--alore-alore-video-stream-dev.modal.run');
+            if (!response.body) {
+                throw new Error('Response body is null');
+            }
             const reader = response.body.getReader();
             const stream = new ReadableStream({
               start(controller) {
@@ -143,8 +146,15 @@ export const PlayerProvider: React.FC<PropsWithChildren<PlayerProps>> = ({
                       return;
                     }
                     // Convert hex string back to binary data
+                    if (!value) {
+                        throw new Error('Value is null');
+                    }
                     const hexString = new TextDecoder("utf-8").decode(value);
-                    const binaryString = hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16));
+                    const bString = hexString.match(/.{1,2}/g);
+                    if (!bString) {
+                        throw new Error('bString is null');
+                    }
+                    const binaryString = bString.map(byte => parseInt(byte, 16));
                     const uint8Array = new Uint8Array(binaryString);
                     controller.enqueue(uint8Array);
                     read();
